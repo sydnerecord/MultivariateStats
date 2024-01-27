@@ -247,7 +247,7 @@ hist(usAir[,1])
 hist(usAirsqrt[,1]) 
 ```
 
-Compare histograms for the raw data and the log transformed data for each variable…
+Compare histograms for the raw data and the square root transformed data for each variable…
 
 Remember that square root transformations are best used on count data.
 
