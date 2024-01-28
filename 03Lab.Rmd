@@ -1,0 +1,396 @@
+---
+title: "Lab 3 Matrix Algebra and Ordination Part I"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_knit$set(root.dir = normalizePath("../"))
+opts_chunk$set(echo = TRUE, tidy = TRUE)
+```
+
+# Set up R session
+
+
+## Download packages 
+
+Install and load packages
+
+```{r warning=FALSE, message=FALSE}
+library(MVA)
+library(psych)
+library(Hmisc)
+library(vegan)
+library(StatMatch)
+library(MASS)
+
+```
+
+
+# A primer of matrix algebra
+
+Let’s start by making our own matrix:
+
+```{r}
+newMatrix<- matrix(c(1,4,5,4,5,6,9,1,9),nrow=3, ncol=3)
+newMatrix
+```
+The command `c` concatenates a list of numbers.
+
+Now let’s check the dimensions of newMatrix:
+
+```{r}
+dim(newMatrix)
+```
+
+## Matrix addition and subtraction
+
+## Question 1: Create a new matrix to either add to or subtract from "newMatrix." This new matrix should be a 3 x 3 matrix containing all ones and call it oneMatrix. (15 pts)
+
+Now add oneMatrix to newMatrix:
+
+```{r eval=FALSE}
+newMatrix + oneMatrix
+```
+
+
+
+Then subtract oneMatrix from newMatrix:
+```{r eval=FALSE}
+newMatrix - oneMatrix
+```
+
+
+
+**Remember, because matrix addition and subtraction is performed on an element by element basis, matrices must have the same dimensions.**
+
+## Scalar Multiplication
+
+A **Scalar** is a single number. Scalar multiplication multiplies a scalar times a matrix:
+
+```{r eval=FALSE}
+3*newMatrix
+```
+
+
+An *eigenvalue* is a scalar that is an essential component of multivariate analysis. We will explore this in a little bit.
+
+
+## Matrix Multiplication
+You use `%` to signify that are using a matrix operation. Otherwise, R will attempt the operation element by element.
+
+```{r eval=FALSE}
+oneMatrix%*%newMatrix
+```
+
+order matters:
+
+```{r eval=FALSE}
+newMatrix%*%oneMatrix
+```
+
+
+
+**The number of columns in the first matrix must equal the number of rows in the second matrix.**
+
+
+## Matrix transposition
+
+**Transposing** a matrix involves interchanging its rows and columns:
+
+```{r}
+transMatrix<-t(newMatrix)
+
+```
+
+
+## Identity Matrices
+
+An **identity matrix** is a matrix where all the diagonal terms equal one and the remaining elements equal 0:
+
+```{r}
+Identity<-diag(3)
+
+```
+\newline
+
+## Matrix Inversion
+
+The inverse of matrix A is A-1. 
+
+
+```{r}
+invMatrix<-solve(newMatrix)
+
+```
+
+
+Multiplying a matrix by its inverse yields and identity matrix (A x A-1 = I):
+
+
+```{r eval=FALSE}
+invMatrix%*%newMatrix
+```
+
+Let’s round it:
+
+```{r eval=FALSE}
+round(invMatrix%*%newMatrix,10)
+```
+
+\newline
+
+## Eigenvalues and eigenvectors
+
+Remember that an eigenvalue is a special scalar and the associated eigenvector is a vector that are key components of PCA.
+
+```{r}
+eig<-eigen(newMatrix)
+```
+
+\newline
+
+
+#	Principal Component Analysis (PCA)
+You are going to conduct a PCA on the `USairpollution` data that we used in Lab 2.
+
+First let’s call in the data:
+
+```{r}
+usAir<-USairpollution
+```
+
+
+Now, look at the distributions (i.e., histograms) of the variables to determine if they need to be transformed. You should be able to make the histograms and transform them based on what you learned during Lab 2. 
+
+## What variable did you transform, and what transformation did you use? (15 pts)
+
+If you do transform any variables, use the transformed data matrix going forward.
+
+Next, apply a z-score standardization:
+
+```{r results='hide'}
+ZusAir<-scale(usAir)
+```
+\newline
+
+# Running the PCA:
+You are going to use the package `princomp` function in the stats package. Take some time to read about this function:
+
+
+```{r eval=FALSE}
+?princomp
+```
+
+Run the princomp function:
+
+```{r}
+usAir_pca <- princomp(ZusAir, cor = F)
+```
+
+
+
+cor = F, because you are using the covariance matrix instead of the correlation matrix.
+
+**It should be noted that the covariance matrix of a z-standardized data matrix is equivalent to the correlation matrix of the unscaled data.**
+
+\newline
+
+Let’s look at a summary of our PCA:
+
+```{r}
+summary(usAir_pca)
+```
+
+Notice that the summary gives the standard deviation instead of the eigenvalue (variance). Let’s calculate the eigenvalues using what we know about the relationship between standard deviation and variance (var = sd^2):
+
+```{r}
+eigenVal<- (usAir_pca$sdev*sqrt(41/40))^2
+```
+
+
+
+The *sqrt(41/40)* is to correct for the fact that princomp calculates variances with the divisor N instead of N-1 as is customary. This adjustment will allow direct comparison with “hand” calculated eigenvalues using the function `eigen` below. Note that these hand calculations are just to help you understand what is going on 'under the hood' in the model. 
+
+Let’s make the PCA table with the eigenvalues instead of the standard deviations:
+
+```{r}
+propVar<-eigenVal/sum(eigenVal)
+cumVar<-cumsum(propVar)
+pca_Table<-t(rbind(eigenVal,propVar,cumVar))
+pca_Table
+```
+
+
+**This calculation and table are just to show you that the eigenvalues and the output from `princomp`, the stadard deviations, are the same thing. YOU DO NOT NEED TO DO THIS WHEN YOU RUN A PCA - it is just to help you gain a deeper understanding of the model.**
+
+
+the factor loadings from `princomp`:
+
+```{r}
+loadings(usAir_pca)
+```
+
+
+and the factor scores:
+
+```{r eval=FALSE}
+scores(usAir_pca)
+```
+
+
+
+
+\newline
+
+## Determining number of axes to keep
+
+You now have 7 PC axes. Which ones give us vital information and which ones can we toss? One method for selecting the number of Axes is a **Scree plot**:
+
+
+```{r}
+plot(usAir_pca, type="lines")
+```
+
+How about the **latent root criterion (i.e., keep components with eigenvalues > 1)** and the **relative percent variance criteria**.  Check the summary of the PCA explore this: 
+
+```{r}
+summary(usAir_pca)
+```
+
+
+
+## Question 3: How many axes you should keep and why? (15 points)
+
+\newline
+
+## Significance of factor loadings.
+While many use the “rule of thumb” where a loading > 0.30 dictates an “important” variable. Another method for determining significance of factor loadings is bootstrapping. Details and comparisons of the many way to assess significance of factor loadings are presented in Peres-Neto et al. (2003), which is supplemental reading for this week. Here we will run the method that they found to have the lowest type I error rates, Bootstrapped eigenvector. For reference, this is the method 6 in Peres-Neto et al. (2003).
+
+```{r}
+sigpca2<-function (x, permutations=1000, ...)
+{
+  pcnull <- princomp(x, ...)
+  res <- pcnull$loadings
+  out <- matrix(0, nrow=nrow(res), ncol=ncol(res))
+  N <- nrow(x)
+  for (i in 1:permutations) {
+    pc <- princomp(x[sample(N, replace=TRUE), ], ...)
+    pred <- predict(pc, newdata = x)
+    r <-  cor(pcnull$scores, pred)
+    k <- apply(abs(r), 2, which.max)
+    reve <- sign(diag(r[k,]))
+    sol <- pc$loadings[ ,k]
+    sol <- sweep(sol, 2, reve, "*")
+    out <- out + ifelse(res > 0, sol <=  0, sol >= 0)
+  }
+  out/permutations
+}
+
+set.seed(4)
+ 
+sigpca2(ZusAir, permutations=1000)
+
+#Piece-by-piece (read along step-by-step with pg. 2350 section 6) Bootstrapped eigenvector (V vectors)” of Peres-Neto et al. 2003.
+pcnull<-princomp(ZusAir)
+res <- pcnull$loadings
+out <- matrix(0, nrow=nrow(res), ncol=ncol(res))
+N <- nrow(ZusAir)
+pc<-princomp(ZusAir[sample(N, replace=TRUE), ])
+pred <- predict(pc, newdata = ZusAir)        
+r <-  cor(pcnull$scores, pred)
+k <- apply(abs(r), 2, which.max)
+reve <- sign(diag(r[k,]))
+sol <- pc$loadings[ ,k]
+sol <- sweep(sol, 2, reve, "*")
+out <- out + ifelse(res > 0, sol <=  0, sol >= 0)
+```
+
+
+\newline
+
+## PCA plots
+Plot out the factor loadings for the first 2 PC axes:
+
+```{r fig.height= 7, fig.width= 7}
+plot(usAir_pca$loadings,type="n",xlab="PC 1, 39%", ylab="PC 2, 21%",ylim=c(-.8,.8), xlim=c(-.6,.6))
+
+text(usAir_pca$loadings, labels=as.character(colnames(ZusAir)), pos=1, cex=1)
+```
+
+
+## Question 4: How do you interpret these axes? Come up with a name for each. (15 pts)
+
+**Close the plot window after viewing**
+
+\pagebreak
+
+Let’s now plot the PC score for each sample (city):
+
+```{r fig.height= 7, fig.width= 7 }
+plot(usAir_pca$scores,type="n",xlab="PC 1, 39%", ylab="PC 2, 21%",ylim=c(-2.5,4), xlim=c(-4,8))
+text(usAir_pca$scores, labels=as.character(rownames(ZusAir)), pos=1, cex=1)
+
+```
+
+
+\newline
+
+And now all together in a `biplot`:
+
+```{r eval=FALSE}
+?biplot
+```
+
+```{r fig.height= 7, fig.width= 7}
+biplot(usAir_pca$scores,usAir_pca$loading,xlab="PC 1, 39%", ylab="PC 2, 21%",expand= 4, ylim=c(-6.5,6), xlim=c(-4,7.5))
+```
+
+
+\newline
+
+to replace city names with a symbol:
+
+```{r fig.height= 7, fig.width= 7}
+biplot(usAir_pca$scores,usAir_pca$loading, expand= 4, xlabs= rep("*",41),xlab="PC 1, 39%", ylab="PC 2, 21%",ylim=c(-6.5,6), xlim=c(-4,7))
+
+```
+
+\newline
+
+# Eigen Analysis
+
+You can also just simply use the Eigen analysis function, `eigen` and calculate your own scores by hand. Note that I am showing this for illustration for those of you who want to have a deeper understanding of the method.
+
+```{r}
+eig<-eigen(cov(ZusAir))
+```
+
+Extract the first two eigenvectors (because that is what we are interested in plotting):
+```{r}
+eigVec<-as.matrix(eig$vectors[,1:2])
+rownames(eigVec) <- rownames(cov(ZusAir))
+```
+
+
+
+Then simply multiply each eigenvector times the matrix of standardized observation values (ZusAir) and plot!
+
+```{r fig.height= 7, fig.width= 7}
+scores<-t(rbind(eigVec[,1]%*%t(ZusAir),eigVec[,2]%*%t(ZusAir)))#hand calculated scores
+
+# and plot
+
+biplot(scores,eigVec,xlab="PC 1, 39%", ylab="PC 2, 21%",expand= 4, ylim=c(-6.5,6), xlim=c(-4,7.5))
+```
+
+
+## Question 5: Does your individual dataset (the one used in Lab 2) meet the assumptions of PCA? Is PCA an analysis you could use on your data? (40 pts)
+
+
+
+\newline
