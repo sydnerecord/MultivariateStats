@@ -49,7 +49,7 @@ dim(newMatrix)
 
 ## Matrix addition and subtraction
 
-## Question 1: Create a new matrix to either add to or subtract from "newMatrix." This new matrix should be a 3 x 3 matrix containing all ones and call it oneMatrix. (15 pts)
+## Question 1: Create a new matrix to either add to or subtract from "newMatrix." This new matrix should be a 3 x 3 matrix containing all ones and call it oneMatrix. (20 pts)
 
 Now add oneMatrix to newMatrix:
 
@@ -264,7 +264,7 @@ summary(usAir_pca)
 
 
 
-## Question 3: How many axes you should keep and why? (15 points)
+## Question 2: How many axes you should keep and why? (20 points)
 
 \newline
 
@@ -323,7 +323,7 @@ text(usAir_pca$loadings, labels=as.character(colnames(ZusAir)), pos=1, cex=1)
 ```
 
 
-## Question 4: How do you interpret these axes? Come up with a name for each. (15 pts)
+## Question 3: How do you interpret these axes? Come up with a name for each. (20 pts)
 
 **Close the plot window after viewing**
 
@@ -389,7 +389,7 @@ biplot(scores,eigVec,xlab="PC 1, 39%", ylab="PC 2, 21%",expand= 4, ylim=c(-6.5,6
 ```
 
 
-## Question 5: Does your individual dataset (the one used in Lab 2) meet the assumptions of PCA? Is PCA an analysis you could use on your data? (40 pts)
+## Question 4: Does your individual dataset (the one used in Lab 2) meet the assumptions of PCA? Is PCA an analysis you could use on your data? (40 pts)
 
 
 
