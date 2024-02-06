@@ -1,0 +1,235 @@
+---
+title: "Lab 4 Ordination Part II"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_knit$set(root.dir = normalizePath("../"))
+opts_chunk$set(echo = TRUE, tidy = TRUE)
+```
+
+## Objective
+Today we will work through examples of Principal Coordinates Analysis (PCoA) and Non-Metric Multidimensional Scaling (NMDS).
+
+## Data
+
+Call in the data set “Current_Hawaiian_Birds.csv” from your working directory and name it *birds*. This data set consists of presence/absence data for bird species on the 6 main Hawaiian Islands in the current time period. You will be using this data set for the	**Principal Coordinates Analysis (PCoA)**.
+
+```{r}
+birds<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab4/Current_Hawaiian_Birds.csv", row=1, header=TRUE)
+```
+
+Next, call in the data set “combined_birds.csv” and call it *birds2*. This data set consists of presence/absence data for bird species on the 6 main Hawaiian Islands in the current time period and the historical time period (i.e. before colonization by Europeans). You will be using this data set for the **Non-Metric Multidimensional Analysis (NMDS)**.
+
+```{r}
+birds2<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab4/combined_birds.csv", row=1, header=TRUE)
+```
+
+## Download packages 
+
+You will be using the packages `vegan` and `ca`. If you do not already have them installed, remember that you will first need to install them using the 'install.packages' function.
+
+```{r warning=FALSE, message=FALSE}
+library(vegan)
+library(ca)
+```
+
+
+\newline
+
+# Principal Coordinates Analysis (PCoA)
+PCoA is a flexible analysis that is performed on a variety of distance matrices (e.g. Euclidean, Jaccard index, Sorensen index). `birds` is a binary data set so lets use the *Sørensens’s index*. *Note that there are many possible indices to use for binary data; see the optional Koleff et al. 2003 reading listed in our readings on Brightspace.*
+
+Please note that the Bray–Curtis dissimilarity is directly related to the quantitative Sørensen similarity index when using binary data. That is why the argument method in the function 'vegdist' below is set to "bray":
+ 
+```{r results='hide'}
+jbirds<-vegdist(birds, "bray")
+```
+
+## Question 1: Which island pair is the most similar? (15 pts)
+
+\newline
+
+You are going to use the `cmdscale` function in the *stats* package to run the PCoA:
+
+
+```{r results='hide'}
+?wcmdscale
+
+wcmd<-wcmdscale(jbirds, k=5, eig=TRUE) 
+
+```
+
+
+The “points” are the coordinates of each island. They are the *eigenvectors* scaled by the square root of their *eigenvalues* (i.e. the standard deviation):
+
+
+```{r results='hide'}
+wcmd$points
+```
+\newline
+
+Let’s make a PCoA table to look at the eigenvalues, and the proportional and cumulative variance:
+
+```{r}
+eigenvalues<-wcmd$eig[1:5]
+propVar<-eigenvalues/sum(eigenvalues)
+cumVar<-cumsum(propVar)
+PCoA_Table<-cbind(eigenvalues,propVar,cumVar)
+PCoA_Table
+```
+\newline
+
+**Scree plot**:
+
+
+```{r}
+plot(eigenvalues)
+lines(lowess(eigenvalues))
+```
+
+## Question 2: How many axes should you keep? (15 pts)
+
+\newline
+
+Now, let’s plot the first two PCoA axes:
+
+```{r}
+x<-wcmd$points[,1]
+y<-wcmd$points[,2]
+plot(x,y,xlab= "Coordinate 1", ylab="Coordinate 2", xlim=range(x)*1.2,ylim=range(y)*1.2, type="n")
+text(x,y,labels=rownames(wcmd$points), cex=.9)
+```
+
+\newline
+
+Another way to plot:
+
+```{r}
+?orditorp
+
+ordiplot(scores(wcmd)[,c(1,2)], type="t",cex=1, main="Hawaiian Bird PCoA")
+abline(h=0,lty=3)
+abline(v=0,lty=3)
+
+#Add species by computing their weighted average ordination scores
+?wascores
+
+species<-wascores(wcmd$points[,1:2],birds)
+#text(species,rownames(species),cex=.7, col="red")
+orditorp(species,display='species',labels=rownames(species), col='lightblue')
+```
+## Question 3: What species is most associated with the island of Hawaii? (15 pts)
+
+\newline
+
+## By "hand" for those who are interested in it. Or skip ahead to the NMDS section.
+
+Ok, let’s now run a PCoA following the directions that I gave during lecture. 
+
+```{r}
+jbirds<-vegdist(birds, "bray")
+CORD<--1/2*jbirds^2
+C<-as.matrix(CORD)
+cs<-colMeans(C)
+rs<-rowMeans(C)
+C1<-sweep(C,MARGIN=2,cs,FUN="-")
+C2<-sweep(C1,MARGIN=1,rs,FUN="-")
+delta<-mean(C)+C2
+
+# Next, run an eigen analysis:
+EG<-eigen(delta)
+eigenvalues2<-EG$values[1:5]
+
+# And make our PCoA table:
+propVar2<-eigenvalues2/sum(eigenvalues2)
+cumVar2<-cumsum(propVar2)
+PCoA_Table2<-cbind(eigenvalues2,propVar2,cumVar2)
+PCoA_Table2
+
+#You scale the eigenvectors by the square root of their eigenvalues to get the coordinates (points):
+points2<-sweep(EG$vectors[,1:5],MARGIN=2,sqrt(eigenvalues2), FUN="*")
+points2
+x<-points2[,1]
+y<-points2[,2]
+```
+
+\newline
+
+**Lets plot this**
+
+```{r}
+#The coordinates:
+plot(x,y,xlab= "Coordinate 1", ylab="Coordinate 2", xlim=range(x)*1.2,ylim=range(y)*1.2, type="n")
+text(x,y,labels=rownames(birds), cex=.9)
+
+
+# Calculate weighted species scores:
+scores1<-sweep(birds,MARGIN=1,x, FUN="*")
+species1<-colSums(scores1)/colSums(birds)
+scores2<-sweep(birds,MARGIN=1,y, FUN="*")
+species2<-colSums(scores2)/colSums(birds)
+
+# Add to the plot. Note that using vegan enables a lot nicer plotting than these hand calculations.
+
+text(cbind(species1,species2),colnames(birds),cex=.7, col="red")
+```
+
+\newline
+
+
+# Non-Metric Multidimensional Analysis (NMDS)
+
+**NMDS** is the most flexible ordination technique. It operates on a distance matrix and projects samples that are similar, close together and ones that are different, far apart.
+
+Create Sørensens’s disimilarity martix for the `birds` data:
+
+```{r}
+jbirds2<-vegdist(birds2, "bray") 
+```
+
+\newline
+
+You are going to use the metaMDS function in the vegan package. K = 2 because we are interested in only two dimensions (which is common for NMDS).
+
+```{r}
+?metaMDS
+
+nmdsBird<-metaMDS(jbirds2,k=2, trace=T)
+stressplot(nmdsBird)
+```
+
+## Question 4: What do the stress value and the fit (R2) of the monotonic regression tell you about the NMDS plot? (15 pts)
+
+\newline
+
+Let’s plot out our results and see if there is a difference between the historical and current Hawaiian bird assemblages?
+
+```{r fig.height= 7, fig.width= 7}
+#Identify the time period as groups:
+
+treat=as.matrix(c(rep("Historical",6),rep("Current",6)))
+
+#Plot out the points (islands):
+
+ordiplot(nmdsBird,type="n",xlim=c(-.5,.5),ylim=c(-.5,.5))
+orditorp(nmdsBird,display="sites",col=c(rep("green",6),rep("blue",6)),air=0.01,cex=1.25)
+legend(-.55,.5, c("Historical","Current"), cex=0.8, 
+col=c("green","blue"), pch=15:15)
+
+#Add an ellipse representing the standard error around each group:
+
+ordiellipse(nmdsBird, treat, display="si",lty=1, col="green", show.groups="Historical", kind='se')
+ordiellipse(nmdsBird, treat, display="si", lty=1, col="blue", show.groups="Current",kind='se')
+
+```
+## Question 5: Are the historic and current bird distributions on the islands statistically different? Why? (15 pts)
+
+## Question 6: Does your personal data set for class meet the assumptions of either PCoA or NMDS? (25 pts)
+
+**If you are done early, please go ahead and get started on Project 1.**
