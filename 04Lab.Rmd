@@ -14,11 +14,12 @@ opts_chunk$set(echo = TRUE, tidy = TRUE)
 ```
 
 ## Objective
+
 Today we will work through examples of Principal Coordinates Analysis (PCoA) and Non-Metric Multidimensional Scaling (NMDS).
 
 ## Data
 
-Call in the data set “Current_Hawaiian_Birds.csv” from your working directory and name it *birds*. This data set consists of presence/absence data for bird species on the 6 main Hawaiian Islands in the current time period. You will be using this data set for the	**Principal Coordinates Analysis (PCoA)**.
+Call in the data set “Current_Hawaiian_Birds.csv” from your working directory and name it *birds*. This data set consists of presence/absence data for bird species on the 6 main Hawaiian Islands in the current time period. You will be using this data set for the **Principal Coordinates Analysis (PCoA)**.
 
 ```{r}
 birds<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab4/Current_Hawaiian_Birds.csv", row=1, header=TRUE)
@@ -30,7 +31,7 @@ Next, call in the data set “combined_birds.csv” and call it *birds2*. This d
 birds2<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab4/combined_birds.csv", row=1, header=TRUE)
 ```
 
-## Download packages 
+## Download packages
 
 You will be using the packages `vegan` and `ca`. If you do not already have them installed, remember that you will first need to install them using the 'install.packages' function.
 
@@ -39,14 +40,14 @@ library(vegan)
 library(ca)
 ```
 
-
 \newline
 
 # Principal Coordinates Analysis (PCoA)
+
 PCoA is a flexible analysis that is performed on a variety of distance matrices (e.g. Euclidean, Jaccard index, Sorensen index). `birds` is a binary data set so lets use the *Sørensens’s index*. *Note that there are many possible indices to use for binary data; see the optional Koleff et al. 2003 reading listed in our readings on Brightspace.*
 
 Please note that the Bray–Curtis dissimilarity is directly related to the quantitative Sørensen similarity index when using binary data. That is why the argument method in the function 'vegdist' below is set to "bray":
- 
+
 ```{r results='hide'}
 jbirds<-vegdist(birds, "bray")
 ```
@@ -57,7 +58,6 @@ jbirds<-vegdist(birds, "bray")
 
 You are going to use the `cmdscale` function in the *stats* package to run the PCoA:
 
-
 ```{r results='hide'}
 ?wcmdscale
 
@@ -65,13 +65,12 @@ wcmd<-wcmdscale(jbirds, k=5, eig=TRUE)
 
 ```
 
-
 The “points” are the coordinates of each island. They are the *eigenvectors* scaled by the square root of their *eigenvalues* (i.e. the standard deviation):
-
 
 ```{r results='hide'}
 wcmd$points
 ```
+
 \newline
 
 Let’s make a PCoA table to look at the eigenvalues, and the proportional and cumulative variance:
@@ -83,10 +82,10 @@ cumVar<-cumsum(propVar)
 PCoA_Table<-cbind(eigenvalues,propVar,cumVar)
 PCoA_Table
 ```
+
 \newline
 
 **Scree plot**:
-
 
 ```{r}
 plot(eigenvalues)
@@ -124,13 +123,14 @@ species<-wascores(wcmd$points[,1:2],birds)
 #text(species,rownames(species),cex=.7, col="red")
 orditorp(species,display='species',labels=rownames(species), col='lightblue')
 ```
+
 ## Question 3: What species is most associated with the island of Hawaii? (15 pts)
 
 \newline
 
 ## By "hand" for those who are interested in it. Or skip ahead to the NMDS section.
 
-Ok, let’s now run a PCoA following the directions that I gave during lecture. 
+Ok, let’s now run a PCoA following the directions that I gave during lecture.
 
 ```{r}
 jbirds<-vegdist(birds, "bray")
@@ -182,7 +182,6 @@ text(cbind(species1,species2),colnames(birds),cex=.7, col="red")
 
 \newline
 
-
 # Non-Metric Multidimensional Analysis (NMDS)
 
 **NMDS** is the most flexible ordination technique. It operates on a distance matrix and projects samples that are similar, close together and ones that are different, far apart.
@@ -228,6 +227,7 @@ ordiellipse(nmdsBird, treat, display="si",lty=1, col="green", show.groups="Histo
 ordiellipse(nmdsBird, treat, display="si", lty=1, col="blue", show.groups="Current",kind='se')
 
 ```
+
 ## Question 5: Are the historic and current bird distributions on the islands statistically different? Why? (15 pts)
 
 ## Question 6: Does your personal data set for class meet the assumptions of either PCoA or NMDS? (25 pts)
