@@ -1,0 +1,240 @@
+---
+title: "Lab 6 Cluster Analysis Part II"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_knit$set(root.dir = normalizePath("../"))
+opts_chunk$set(echo = TRUE, tidy = TRUE)
+```
+
+The goal of this lab is to become familiar with the application of **Polythetic Hierarchical Divisive** and **Agglomerative Clustering**.
+
+## Data
+
+Call in the data set “Caribbean_birds.csv” from your working directory and call it 'birds'. This data set consists of presence-absence data for bird species on 19 Caribbean Islands.
+
+```{r}
+birds<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab6/Caribbean_birds.csv", row=1, header=TRUE)
+```
+
+## Download packages
+
+We will be using the following packages:
+
+```{r warning=FALSE, message=FALSE}
+#library(raster)
+library(cluster)
+library(vegan)
+library(pvclust)
+```
+
+# Calculating the distance/dissimilarity matrix
+
+For this lab, we will use Jaccard's dissimilarity metric for calculating the dissimilarity matrix.
+
+## Question 1: Why is Jaccard's an appropriate dissimilarity metric for this dataset? (10 pts)
+
+```{r}
+distBirds<-vegdist(birds,"jaccard")
+```
+
+# Polythetic Agglomerative Hierarchical Clustering (PAHC)
+
+You will use the `hclust` function in the *stats* package to conduct PAHC. This `hclust` function contains the six fusion methods we discussed in lecture. We will use `hclust` to cluster the Caribbean bird data and construct dendrograms.
+
+```{r eval=FALSE}
+?hclust
+```
+
+## Clustering algorithms
+
+Note that the method argument in 'hclust' specifies the fusion method.
+
+```{r}
+singleTree<-hclust(distBirds, method = "single")
+completeTree<-hclust(distBirds, method = "complete")
+centroidTree<-hclust(distBirds, method = "centroid")
+medianTree<-hclust(distBirds, method = "median")
+averageTree<-hclust(distBirds, method = "average")
+wardTree<-hclust(distBirds, method = "ward.D2")
+```
+
+Let’s plot each dendrogram individually and explore the patterns:
+
+```{r  eval=FALSE}
+plot(singleTree)
+plot(completeTree)
+plot(centroidTree)
+plot(medianTree)
+plot(averageTree)
+plot(wardTree)
+```
+
+Let’s now look at the dendrograms on the same plot. Note that this won't print nicely in your Word document, but you'll be able to see it if you make the upper left editor tab in RStudio large:
+
+```{r eval=FALSE}
+par(mfrow=c(2,3))
+plot(singleTree)
+plot(completeTree)
+plot(centroidTree)
+plot(medianTree)
+plot(averageTree)
+plot(wardTree)
+```
+
+## Question 2: What groups are clustering together? Do the clusters change with different methods? (20 pts)
+
+## Evaluating the cluster solution
+
+We learned in lecture three main ways to evaluate the cluster solution. The *agglomerative coefficient*, the *cophenetic correlation coefficient*, and *Monte Carlo* simulations (i.e. bootstrapping).
+
+### Agglomerative coefficient
+
+First, calculate the *agglomerative coefficient* for each fusion method:
+
+```{r results='hide'}
+ag1<-coef.hclust(singleTree)
+ag2<-coef.hclust(completeTree)
+ag3<-NA
+ag4<-NA
+ag5<-coef.hclust(averageTree)
+ag6<-coef.hclust(wardTree)
+```
+
+Now lets put them in a table:
+
+```{r}
+methods<-c("single","complete","centroid", "median", "average", "ward")
+agc<-round(c(ag1,ag2,ag3,ag4,ag5,ag6),2)
+agcTable<-data.frame(methods,agc)
+
+```
+
+## Question 3: Why is the agglomerative coeffient 'NA' for the centroid and median fusion methods? (10 pts)
+
+### Cophenetic correlation coefficient
+
+Next, let’s calculate the *cophenetic correlation coefficient*. This will allow us to see how well the dendrogram built by each fusion method reproduces the original distance matrix and will also allow us to compare the different fusion methods:
+
+```{r results='hide'}
+cc1<-cor(distBirds,cophenetic(singleTree))
+cc2<-cor(distBirds,cophenetic(completeTree))
+cc3<-cor(distBirds,cophenetic(centroidTree))
+cc4<-cor(distBirds,cophenetic(medianTree))
+cc5<-cor(distBirds,cophenetic(averageTree))
+cc6<-cor(distBirds,cophenetic(wardTree))
+cophCor<-round(c(cc1,cc2,cc3,cc4,cc5,cc6),2)
+```
+
+Let’s put this all in a table:
+
+```{r}
+methods<-c("single","complete","centroid", "median", "average", "ward")
+dendrogramTable<-data.frame(methods,cophCor,agc)
+dendrogramTable
+```
+
+**A loop!**
+
+This loop can be applied above anytime you are doing the same function (e.g., hclust) but one thing is changing (i.e., fusion method). Here, I show it for calculating the cophenetic correlation to show you another way to generate the values of the table we just made. What we are doing is looping the function for calculating the cophenetic correlation over a list of names that refer to dendrograms made with different linkage methods.
+
+```{r}
+
+#function telling the loop to read the input as text
+e = function(expr) eval(parse(text=expr)) 
+
+#sets up a variable to fill with the output of the loop. 
+#note that growing objects from a for loop is not a good idea for more computationally onerous calculations, but it's ok here.
+cc<-NULL 
+
+#list of names for the loop
+methodList <- c("singleTree", "completeTree", "centroidTree", "medianTree", "averageTree", "wardTree") 
+
+# run the loop
+for (i in methodList) {
+  cc[i]<-round(cor(distBirds,cophenetic(e(i))),2)
+}
+
+cc
+```
+
+### Bootstrapping
+
+Last but not least, let’s run a bootstrap permutation to see how many clusters are statistically significant. We are going to use the function `pvclust` in the *pvclust* package. Since we know that “single”, “complete”, and “average” linkage methods had the highest cophenetic correlation, let’s focus on these:
+
+```{r}
+
+?pvclust
+```
+
+The resampling procedure takes a little bit of time so we will only use 100 bootstraps (nboot = 100). Normally, you would conduct at least 1000:
+
+```{r eval=FALSE}
+boot1<-pvclust(t(birds), method.hclust="single",method.dist="binary", nboot=100)
+boot2<-pvclust(t(birds), method.hclust="complete",method.dist="binary", nboot=100)
+boot3<-pvclust(t(birds), method.hclust="average",method.dist="binary", nboot=100)
+
+#Here, "binary" is Jaccard 
+```
+## Question 4: Why is it preferable to increase the number of bootstrap iterations when possible computationally? (10 pts)
+
+
+Now plot each dendrogram with the p-values from the Monte Carlo simulation. The “au” p-values (in red) correspond to multi-scale bootstrapping, while the “bp” p-values correspond to normal bootstrapping. The first row of plots has rectangles (function `pvrect`) around the largest cluster with p-values ≤ 0.05 according to the “au” method. The second row of plots has rectangles placed around the largest clusters with p-values ≤ 0.05 according to the “bp” method.
+
+```{r eval=FALSE}
+
+?pvrect
+
+par(mfrow=c(2,3))
+
+plot(boot1)
+pvrect(boot1, alpha=0.95, pv="au")
+plot(boot2)
+pvrect(boot2, alpha=0.95, pv="au")
+plot(boot3)
+pvrect(boot3, alpha=0.95, pv="au")
+
+plot(boot1)
+pvrect(boot1, alpha=0.95, pv="bp")
+plot(boot2)
+pvrect(boot2, alpha=0.95, pv="bp")
+plot(boot3)
+pvrect(boot3, alpha=0.95, pv="bp")
+```
+
+# Polythetic Divisive Hierarchical Clustering (PDHC)
+
+You will use the `diana` function in the *cluster* package to conduct PDHC. We will use `diana` to cluster the Caribbean bird data and construct dendrograms.
+
+```{r eval=FALSE}
+?diana
+```
+
+## Clustering algorithm
+
+```{r}
+diTree <- diana(distBirds)
+
+#Next, plot the dendrogram:
+
+plot(diTree, which.plots = 2)
+
+#calculate the divisive coefficient
+
+diTree$dc
+
+#and calculate the cophenetic correlation coefficient:
+
+d.coph <- cor(distBirds,cophenetic(diTree))
+```
+## Question 5: How do the results of the PAHC (Ward's method) and the PDHC differ? (10 pts)
+
+## Question 6: Would PAHC or PDHC be appropriate for using on your data or a subset of your data? (40 pts)
+
+***Optional:*** **If you have extra time, try the these analyses on the island birds of the Atlantic Ocean (atlantic_birds.csv).**
