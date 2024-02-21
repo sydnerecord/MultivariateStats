@@ -13,7 +13,7 @@ opts_knit$set(root.dir = normalizePath("../"))
 opts_chunk$set(echo = TRUE, tidy = TRUE)
 ```
 
-The goal of this lab is to become familiar with the application of **Polythetic Hierarchical Divisive** and **Agglomerative Clustering**.
+The goal of this lab is to become familiar with the application of **Polythetic Agglomerative Clustering**.
 
 ## Data
 
@@ -182,6 +182,7 @@ boot3<-pvclust(t(birds), method.hclust="average",method.dist="binary", nboot=100
 
 #Here, "binary" is Jaccard 
 ```
+
 ## Question 4: Why is it preferable to increase the number of bootstrap iterations when possible computationally? (10 pts)
 
 
@@ -208,33 +209,6 @@ plot(boot3)
 pvrect(boot3, alpha=0.95, pv="bp")
 ```
 
-# Polythetic Divisive Hierarchical Clustering (PDHC)
-
-You will use the `diana` function in the *cluster* package to conduct PDHC. We will use `diana` to cluster the Caribbean bird data and construct dendrograms.
-
-```{r eval=FALSE}
-?diana
-```
-
-## Clustering algorithm
-
-```{r}
-diTree <- diana(distBirds)
-
-#Next, plot the dendrogram:
-
-plot(diTree, which.plots = 2)
-
-#calculate the divisive coefficient
-
-diTree$dc
-
-#and calculate the cophenetic correlation coefficient:
-
-d.coph <- cor(distBirds,cophenetic(diTree))
-```
-## Question 5: How do the results of the PAHC (Ward's method) and the PDHC differ? (10 pts)
-
-## Question 6: Would PAHC or PDHC be appropriate for using on your data or a subset of your data? (40 pts)
+## Question 5: Would PAHC be appropriate for using on your data or a subset of your data? (50 pts)
 
 ***Optional:*** **If you have extra time, try the these analyses on the island birds of the Atlantic Ocean (atlantic_birds.csv).**
