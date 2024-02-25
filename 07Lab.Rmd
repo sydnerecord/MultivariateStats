@@ -1,0 +1,176 @@
+---
+title: "Lab 7 Testing Groups"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_knit$set(root.dir = normalizePath("../"))
+opts_chunk$set(echo = TRUE, tidy = TRUE)
+```
+\newline
+
+The goal of this lab is to become familiar with the three techniques (**Multiple Response Permutation Procedure (MRPP), PerMANOVA, Analysis of within Group Similarity (ANOSIM)**) for testing if groups are significantly different from one another.
+
+\newline
+
+# Set up R session
+
+## Data
+
+You will be using two different data sets today. For the **MRPP** you will use the snail morphology data set “snails_data.csv” which you are familiar with **(remember use only the first three columns for the snail data set)**. For **PerMANOVA and ANOSIM**, you will use the data set detailing the current and historical composition of bird communities across the Hawaiian Islands “combined_birds.csv” which you are also familiar with.
+
+
+```{r}
+snails<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab7/snail_data.csv", row=1, header=TRUE)[,1:3]
+birds<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab7/combined_birds.csv", row=1, header=TRUE)
+```
+
+
+
+\newline
+
+## Download packages 
+We will be using the following packages: 
+
+
+```{r warning=FALSE, message=FALSE}
+library(cluster)
+library(vegan)
+library(ade4)
+```
+
+\newline
+
+
+#	Multiple Response Permutation Procedure (MRPP)
+
+**MRPP** is a nonparametric method for testing the hypothesis of *no differences between two or more groups*.  You will use MRRP to determine if the southern Atlantic group is significantly different from the Caribbean group from the snail morphology data set. First you must use your clustering skills to create these groups:
+
+
+\newline
+
+Use **k-means clustering** to define the south Atlantic and Caribbean clusters (**LAB 5**). After running the analysis, extract the cluster to be used in the MRPP:
+
+
+```{r results='hide'}
+snails<-scale(snails)
+
+snails.kop <- kmeans(snails, centers= 2, iter.max=10, nstart=25)
+
+groups<-snails.kop$cluster
+```
+
+\newline
+
+You are going to use the `mrpp` function in the *vegan* package. **You must create an appropriate distance matrix for the snail data to conduct an mrpp**.
+
+```{r eval=FALSE}
+?mrpp
+```
+
+
+```{r results='hide'}
+distSnails<-vegdist(snails, method="euclidean")
+
+snailMRPP<-mrpp(distSnails, groups, permutations = 1000)
+```
+\newline
+
+Next, plot out the histogram of permuted deltas:
+
+```{r}
+hist(snailMRPP$boot.deltas, main = "Histogram of snail MRPP deltas" )
+points(snailMRPP$delta,0, pch=19,col="red", bg="red", cex=2)
+
+```
+
+## Question 1: How do you interpret the results of the MRPP for the snail morphology clusters? (25 pts)
+
+
+\newline
+
+# PerMANOVA
+
+**PerMANOVA** is a nonparametric method for testing the hypothesis of *no differences between two or more groups* based on rank dissimilarities. It is a flexible approach that can take any distance metric. You will use PerMANOVA to determine if the current composition of the current Hawaiian Island bird communities is significantly different from the historical (i.e., before colonization by Europeans) time period. PerMANOVA is often used with NMDS. You are going to conduct an NMDS analysis on these data first (LAB 4):
+
+## NMDS
+
+```{r results='hide'}
+jbirds<-vegdist(birds, "bray") 
+
+nmdsBird<-metaMDS(jbirds,k=2, trace=T)
+```
+
+\newline
+
+For plotting the NMDS, create the groups to assign different colors to each time period. You will also use these groups for the *ANOSIM*:
+
+```{r fig.height= 7, fig.width= 7}
+group=as.matrix(c(rep("Historical",6),rep("Current",6)))
+ordiplot(nmdsBird,type="n",xlim=c(-.5,.5),ylim=c(-.5,.5))
+orditorp(nmdsBird,display="sites",col=c(rep("green",6),rep("blue",6)),air=0.01,cex=1.25)
+legend(-.55,.5, c("Historical","Current"), cex=0.8, 
+col=c("green","blue"), pch=15:15)
+
+```
+
+\newline
+
+Next, you are going to use the `adonis` function in the *vegan* package to run the PerMANOVA:
+
+```{r eval=FALSE}
+?adonis2
+```
+
+```{r}
+set.seed(11) 
+
+permBirds<-adonis2(jbirds ~ group, permutations=1000)
+permBirds
+```
+
+
+## Question 2: What do you conclude about the current and historical bird assemblages based on the PerMANOVA? (25 pts)
+
+
+\newline
+
+# Analysis of Group Similarities (ANOSIM)
+
+**ANOSIM** is a nonparametric method for testing the hypothesis of **no differences between two or more groups based on rank dissimilarities**. It is a flexible approach that can take any distance metric. You will use ANOSIM to determine if the current composition of the Hawaiian Island bird communities is significantly different from the historical (i.e. before colonization by Europeans) time period. Anosim is often used with NMDS. We will use the outputs from the NMDS used in the perMANOVA again:
+
+\newline
+
+You are going to use the `anosim` function in the *vegan* package.
+
+```{r eval=FALSE}
+?anosim
+```
+
+
+```{r}
+set.seed(11) 
+
+birdAnosim<-anosim(jbirds, group, permutations = 1000)
+birdAnosim
+```
+
+Explore the output table and then plot the permuted F-ratios:
+
+```{r}
+# Plot the permuted F-ratios
+hist(birdAnosim$perm, main = "Histogram of R statistics for Hawaiian Birds", xlim=c(-.5,1 ))
+points(birdAnosim$statistic,0, pch=19,col="red", bg="red", cex=2)
+```
+
+## Question 3: What do you conclude about the current and historical bird assemblages based on ANOSIM? (25 pts)
+
+## Question 4: Consider these three new analyses and whether or not they would be appropriate for your data be sure to reflect on the model assumptions and research questions you want to ask. (25 pts)
+
+**This is a potentially short lab. Take some time to get ahead if you want by working on Project 2 or your final project.**
+
