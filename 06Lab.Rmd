@@ -185,8 +185,7 @@ boot3<-pvclust(t(birds), method.hclust="average",method.dist="binary", nboot=100
 
 ## Question 4: Why is it preferable to increase the number of bootstrap iterations when possible computationally? (10 pts)
 
-
-Now plot each dendrogram with the p-values from the Monte Carlo simulation. The “au” p-values (in red) correspond to multi-scale bootstrapping, while the “bp” p-values correspond to normal bootstrapping. The first row of plots has rectangles (function `pvrect`) around the largest cluster with p-values ≤ 0.05 according to the “au” method. The second row of plots has rectangles placed around the largest clusters with p-values ≤ 0.05 according to the “bp” method.
+Now plot each dendrogram with the p-values from the Monte Carlo simulation. The “au” p-values (in red) correspond to multi-scale bootstrapping, while the “bp” p-values correspond to normal bootstrapping. The first row of plots has rectangles (function `pvrect`) around the largest cluster deemed significant at an alpha level of 0.05 according to the “au” method. The second row of plots has rectangles placed around the largest clusters deemed significant at an alpha level of 0.05 according to the “bp” method. Note that rather than listing significant p-values as those \<0.05, this function lists them as \>0.95, which is a bit confusing. This is described on the Github [repository](https://github.com/shimo-lab/pvclust) for the package under the *Instruction* section: "For a cluster with AU p-value \> 0.95, the hypothesis that "the cluster does not exist" is rejected with significance level 0.05; roughly speaking, we can think that these highlighted clusters does not only "seem to exist" caused by sampling error, but may stably be observed if we increase the number of observation."
 
 ```{r eval=FALSE}
 
