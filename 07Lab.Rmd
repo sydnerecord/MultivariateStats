@@ -73,10 +73,11 @@ You are going to use the `mrpp` function in the *vegan* package. **You must crea
 ?mrpp
 ```
 
+Note that we set the seed of the random number generator, so that we all get the same results for our permutations.
 
 ```{r results='hide'}
 distSnails<-vegdist(snails, method="euclidean")
-
+set.seed(11)
 snailMRPP<-mrpp(distSnails, groups, permutations = 1000)
 ```
 \newline
