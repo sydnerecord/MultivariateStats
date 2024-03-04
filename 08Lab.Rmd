@@ -1,0 +1,502 @@
+---
+title: "Lab 8 Discriminant Analysis (DA) "
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_knit$set(root.dir = normalizePath("../"))
+opts_chunk$set(echo = TRUE, tidy = TRUE)
+```
+
+\newline
+
+The goal of this lab is to become familiar with **Discriminant Analysis (DA)**. DA allows you to determine what variables are important in separating groups. It is an eigenanalysis that reduces dimensionality of multivariate data into new “canonical axes”. Canonical in statistics is a term describing the analysis of variables that are not directly observed (i.e., latent variables) that represent multiple variables that are directly observed.
+
+\newline
+
+# Set up R session
+
+## Data
+
+Today you will be using the `palmerpenguins` data set found in the palmerpenguins package in R. These data were collected by the Palmer Antarctica Long Term Ecological Research (LTER) site that is part of the LTER network. To access this data set, simply type:
+
+```{r results='hide'}
+# Note this install.packages line is commented out, so that the RMarkdown document would knit.
+#install.packages('palmerpenguins')
+library(palmerpenguins)
+penguins <- penguins
+```
+
+The dataset contain data for 344 penguins. There are three different species of penguins (Adelie, Chinstrap, Gentoo) in this dataset, collected from three islands (Biscoe, Dream, Torgersen) in the Palmer Archipelago, Antarctica. To learn more about the data set:
+
+```{r eval=FALSE}
+?penguins
+```
+
+\newline
+
+## Install and load packages
+
+We will be using the following packages:
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(MASS)
+library(broom)
+library(candisc)
+library(ade4)
+library(vegan)
+library(ggplot2)
+library(mvnormtest)
+library(MVN)
+```
+
+\newline
+
+# Testing the assumptions of DA
+
+## Homogeneity of within-group variance-covariance matrices
+
+\newline
+
+First, lets look at these groups in NMDS space. We'll select just the bill, flipper, and body mass traits.
+
+```{r results='hide'}
+# Remove rows with NA values prior to calculating distance matrix. 
+# Remember one assumption of DA is that no missing data are allowed.
+penguins_noNA <- na.omit(penguins)
+# Calculate Euclidean distance matrix on morphological traits of penguins
+dis <- vegdist(penguins_noNA[,3:6], "euclidean")
+# Run NMDS on the Euclidean distance matrix made above
+penguin_nmds<-metaMDS(dis)
+```
+
+Now lets plot but using ggplot2 this time.
+
+First build a data frame with the first two axes and the groups (i.e., species names):
+
+```{r}
+NMDS=data.frame(NMDS1=penguin_nmds$point[,1],NMDS2=penguin_nmds$point[,2],species=penguins_noNA$species)
+
+ggplot(NMDS,aes(x=NMDS1,y=NMDS2))+
+  geom_point(data=NMDS,aes(x=NMDS1,y=NMDS2, color=species), alpha = 0.5)+
+  viridis::scale_fill_viridis() +
+  theme_bw()
+```
+
+Next, we will use the Fligner-Killeen test of homogeneity of variances. This test has been shown to be robust to departures from normality (which most of our data does to some extent)
+
+```{r eval=FALSE}
+?fligner.test
+```
+
+You want to test the variance of each variable (n=4) across all three groups (i.e., species). **Remember, you don’t want there to be significant differences**
+
+```{r results='hide'}
+fligner.test(penguins_noNA$bill_length_mm, penguins_noNA$species)
+fligner.test(penguins_noNA$bill_depth_mm, penguins_noNA$species)
+fligner.test(penguins_noNA$flipper_length_mm, penguins_noNA$species)
+fligner.test(penguins_noNA$body_mass_g, penguins_noNA$species)
+```
+
+We will also use a Multivariate test of homogeneity of variance called 'betadisper' in the vegan package. **Remember, you don’t want there to be significant differences**
+
+```{r eval=FALSE}
+?betadisper
+```
+
+Calculate multivariate dispersions:
+
+```{r eval=FALSE}
+# Euclidean distances between samples
+dis <- vegdist(penguins_noNA[,3:6], "euclidean")
+
+# groups are the three different species
+groups <- penguins_noNA$species
+
+#multivariate dispersions
+MVdisp <- betadisper(dis, groups)
+
+
+#Perform parametric test
+disp_aov<-anova(MVdisp)
+
+# Tukey's Honest Significant Differences
+MVdisp.HSD <- TukeyHSD(MVdisp)
+MVdisp.HSD
+
+## non-parametric test: Permutation test for F
+perm_MVdisp <- permutest(MVdisp, permutations = 99, pairwise = TRUE)
+perm_MVdisp
+```
+
+\newline
+
+## Question 1: Should you transform the penguin variables based on the tests for homogeneity of variance? (10 pts)
+
+If you think yes, use the code below. If you think no, skip ahead.
+
+```{r}
+log<-cbind.data.frame(apply(penguins_noNA[,3:6]+1,2,log),penguins_noNA$species)
+names(log)[5]<-"Species"
+```
+
+Re-run the Fligner-Killeen test on the transformed data:
+
+```{r results='hide'}
+fligner.test(log$bill_length_mm,log$Species)
+fligner.test(log$bill_depth_mm,log$Species)
+fligner.test(log$flipper_length_mm,log$Species)
+fligner.test(log$body_mass_g,log$Species)
+
+```
+
+Re-run multivariate homogeneity of variance test
+
+```{r eval=FALSE}
+# Euclidean distances between samples
+log_dis <- vegdist(log[,1:4], "euclidean")
+
+
+# groups are the three different species
+groups <- penguins_noNA$species
+
+## Calculate multivariate dispersions
+log_MVdisp <- betadisper(log_dis, groups)
+
+
+#Perform parametric test
+disp_aov<-anova(log_MVdisp)
+
+
+# Tukey's Honest Significant Differences
+MVdisp.HSD <- TukeyHSD(log_MVdisp)
+MVdisp.HSD
+
+# non-parametric test: Permutation test for F
+perm_MVdisp <- permutest(log_MVdisp, permutations = 99, pairwise = TRUE)
+perm_MVdisp
+```
+
+## Question 2: Based on the results of the tests for the DA assumption of equality of group dispersions, would you consider the interpretation of any results of a DA with these data to be descriptive or inferential? (10 pts)
+
+\newline
+
+## Multivariate Normality
+
+To look for multivariate normality, let's look at the distribution of each variable for each group and run (overly conservative) mulitvariate normality tests for both the log and untransformed penguin data.
+
+```{r eval=FALSE}
+#filter for each species: e.g., setosa below
+
+Adelie<-dplyr::filter(penguins_noNA, species == "Adelie")
+Adelielog<-dplyr::filter(log, Species == "Adelie")
+
+
+#untransformed
+
+mshapiro.test(t(Adelie[,3:6]))
+
+mvn(Adelie[,3:6], mvnTest = "mardia")
+
+#log
+
+mshapiro.test(t(Adelielog[,1:4]))
+
+mvn(Adelielog[,1:4], mvnTest = "mardia")
+```
+
+## Question 3: Write some code to assess multivariate normality for the other two species (i.e., Chinstrap and Gentoo) of penguins in the dataset. (10 pts)
+
+\newline
+
+## Multicolinearity
+
+To test for multicolinearity, you should look at all pairwise correlations. Remember, correlations \> 0.7 are often considered problematic.
+
+```{r}
+cor(penguins_noNA[,3:6])
+```
+
+## Question 4: We have some co-linearity. Based on the results from other assumption checks, which variable might be a good one to leave out of this analysis? Perform the remainder of the lab without that variable. Feel free to check with me to make sure you are on the right track before proceeding. (10 pts)
+
+\newline
+
+## Outliers
+
+Outliers can have a large influence on canonical axes in DA. You are going to take a multivariate approach to identifying outliers for the untransformed data (we did this in lab 2). Note we are proceeding with the untransformed data because transformation didn't help to meet any of the assumptions of DA thus far, but we should keep in mind that we might want to used the log transformed data if we have trouble with other assumptions.
+
+```{r eval=FALSE}
+#Calculate a within-group distance matrix:
+#Adelie
+
+eucDist<- vegdist(penguins_noNA[penguins_noNA$species=='Adelie',3:6],"euclidean")
+
+#Calculate the average distance of each sample to all other samples (i.e. column average) and turn the means into z-scores:
+
+multOut<-scale(colMeans(as.matrix(eucDist)))
+
+
+#Now look at a histogram of these data to identify samples that are > 3 sd from the mean:
+
+hist(multOut)
+
+
+#and get the number of those samples:
+
+Adelie_out<-multOut [multOut >3,]
+Adelie_out
+
+#Repeat for the other two groups (i.e.,species):
+
+#Chinstrap
+eucDist<- vegdist(penguins_noNA[penguins_noNA$species=="Chinstrap",3:6],"euclidean")
+multOut<-scale(colMeans(as.matrix(eucDist)))
+hist(multOut)
+Chinstrap_out<-multOut [multOut >3,]
+Chinstrap_out
+
+#Gentoo
+
+eucDist<- vegdist(penguins_noNA[penguins_noNA$species=="Gentoo",3:6],"euclidean")
+multOut<-scale(colMeans(as.matrix(eucDist)))
+hist(multOut)
+Gentoo_out<-multOut[multOut >3,]
+
+#Finally, make a vector of the outliers to pull out of the data set later:
+
+Outliers<-c(Adelie_out,Chinstrap_out,Gentoo_out)
+Outliers
+
+# Remove the outliers from the data set for the analysis moving forward.
+penguins_noNA <- penguins_noNA[-c(96,104,38,39,18,40),]
+```
+
+\newline
+
+## Linearity
+
+Next we test for linear relationship between variables. This is key to making sure that the variables change in a linear fashion along underlying gradients (i.e. canonical axes):
+
+```{r fig.height= 7, fig.width= 7}
+pairs(penguins_noNA[,3:6])
+```
+
+Believe it or not, those pass as linear relationships!
+
+\newline
+
+# Discriminant analysis
+
+You will use the `LDA` function in the *MASS* package to conduct DA and will also use the `candisc` function in the package *candisc*.
+
+```{r eval=FALSE}
+?lda
+
+?candisc
+```
+
+Based on the assumption checks we performed, we will run the analysis on the untransformed data and exclude the body mass variable. We are going to split our data set into “training” data for fitting the DA and “testing” data for validating the DA. We randomly select 75 samples from the penguins data set for the training data. Note that we set the seed for the random number generator below to ensure that we all get comparable results from a consistent randomly selected set of training data.
+
+```{r}
+#Set the seed for the random number generator
+set.seed(11)
+#Create a vector whose length is one half of the number of rows in the penguins data set called train that will indicate the rows randomly selected for the training data.
+train <- sample(seq(1:dim(penguins_noNA)[1]), round(dim(penguins_noNA)[1]*.66))
+```
+
+## Question 5: What does the *dim* function do in the code chunk above? Why do we have to use the round function? (10 pts)
+
+Check the frequency of each species in the training data, which will help set your priors proportional to the number of samples in each species group:
+
+```{r}
+#Determine the counts of each species in the training data
+priorfreq<-table(penguins_noNA$species[train])
+#Convert those counts to probabilites that sum to one
+prior <- (as.vector(priorfreq)/round(dim(penguins_noNA)[1]*.66))
+```
+
+\newline
+
+Next run the DA for the training data:
+
+```{r}
+penguinsLDA <- lda(species ~ bill_length_mm + bill_depth_mm + flipper_length_mm, penguins_noNA, prior = prior, subset = train)
+```
+
+**Pro Tip: if you wanted to use all variables in a dataset, then “Species \~ .” would be the model and the “dot” stands for all of the variables (so you don’t have to type them all)**
+
+We will now assess what the results tell us about the number of meaningful canonical axes and the absolute contribution of each variable to those axes.
+
+\newline
+
+# Assessing and interpreting canonical axes
+
+## Relative % Criterion
+
+The “proportion of trace” from the lda output is the **Relative % criterion**.
+
+```{r}
+penguinsLDA 
+```
+
+## Question 6: According to the relative percent criterion, which axis or axes are meaningful for separating the species? (10 pts)
+
+\newline
+
+## Canonical Correlation Criterion
+
+Here, you want to test the correlation between the canonical scores and the grouping variable. First you need to predict the membership (i.e. calculate canonical scores) of each sample in the training set. You will use the `predict.lda` function from the *MASS* package:
+
+```{r eval=FALSE}
+?predict.lda
+```
+
+```{r}
+penguinsLDA.p<-predict(penguinsLDA, penguins_noNA[train, ])
+```
+
+You want to test the canonical scores (penguinsLDA.P\$x) with the grouping variable (i.e. species):
+
+```{r}
+corTest<-lm(penguinsLDA.p$x~penguins$species[train])
+summary(corTest)
+```
+
+## Question 7: How does the correlation and significance look for each canonical axis? (10 pts)
+
+\newline
+
+## Plot canonical scores and axes
+
+Now visually asses the discrimination of the three species of penguins by the canonical axes:
+
+```{r fig.height= 7, fig.width= 7}
+plot(penguinsLDA, xlim=c(-11,11), ylim=c(-6,6))
+```
+
+\newline
+
+## Classification accuracy
+
+You now want to measure how well the axes discriminate. The higher the correct classification rate, the greater degree of group discrimination achieved by the canonical axes. We will classify the training data first. Create a classification matrix:
+
+```{r}
+ct<- table(penguins_noNA[train, ]$species, predict(penguinsLDA, penguins_noNA[train, ])$class) 
+
+#Change to a table of proportions:
+
+pct<-prop.table(ct)
+pct
+
+#Calculate classification rate by summing the diagonal:
+sum(diag(pct))
+```
+
+\newline
+
+## Interpreting canonical axes (raw coefficients, standardized weights, and structure coefficients)
+
+Unfortunately, `lda` doesn’t provide an easy way to calculate the standardized weights, and structure coefficients. For this, you will use `candisc` in the *candisc* package.
+
+```{r eval=FALSE}
+?candisc
+```
+
+For candisc, you build a linear model using lm:
+
+```{r}
+penguinsmod <- lm(cbind(bill_length_mm, bill_depth_mm, flipper_length_mm) ~ species, data=penguins_noNA[train, ])
+```
+
+And run the candisc function:
+
+```{r}
+penguinscan <- candisc(penguinsmod, data=penguins_noNA[train, ])
+```
+
+Next pull the raw coefficients, standardized weights, and structure coefficients from the output:
+
+```{r}
+penguinscan$coeffs.raw
+penguinscan$coeffs.std
+penguinscan$structure
+```
+
+Note that the raw coefficients are the same as the lda output:
+
+```{r}
+penguinsLDA$scaling
+```
+
+*notice that the signs can sometimes be flipped but coefficients are the same*
+
+## Question 8: Looking at the structure coefficients, how would you “define” the first canonical axis? (10 pts)
+
+\newline
+
+# Validating canonical axes
+
+A DA is only as good as its ability to classify new data correctly. Here, you are going to use the “testing” data from your split sample to see how well the canonical axes predict group membership of “new” samples. You are going to use the predict.lda function again. This time with the testing data (i.e., `penguins_noNA[-train, ]`)
+
+```{r}
+penguinsLDAnew<-predict(penguinsLDA , penguins_noNA[-train, ])
+```
+
+Next, make a classification table and calculate the classification rate:
+
+```{r}
+ynew.table<-table(penguins_noNA[-train,]$species,penguinsLDAnew$class)
+ynew.table
+sum(diag(prop.table(ynew.table)))
+```
+
+## Question 9: How did the canonical axes handle the new data? (10 pts)
+
+\newline
+
+# MANOVA, *the other side of the coin of DA*
+
+In MANOVA, we are interested if groups differ in their measured variables. In DA, we are interested in a linear combination of variables that maximize differences between groups. In this case, MANOVA can provide a test of whether or not the groups are different.
+
+```{r eval=FALSE}
+?manova
+```
+
+```{r eval=FALSE}
+Y<-as.matrix(penguins_noNA[,3:5])
+Sp<-factor(penguins_noNA$species)
+
+fit <- manova(Y ~ Sp)
+summary(fit,test="Wilks")
+```
+
+\newline
+
+## Post-hoc tests:
+
+```{r}
+YAdelie<-as.matrix(penguins_noNA[penguins_noNA$species=='Adelie',3:5])
+YChinstrap<-as.matrix(penguins_noNA[penguins_noNA$species=='Chinstrap',3:5])
+YGentoo<-as.matrix(penguins_noNA[penguins_noNA$species=='Gentoo',3:5])
+Sp<-factor(penguins_noNA$species)
+
+fit1 <- manova(rbind(YAdelie,YChinstrap) ~ c(rep('Adelie',dim(YAdelie)[1]),rep('Chinstrap',dim(YChinstrap)[1])))
+summary(fit1,test="Hotelling-Lawley")
+
+fit2 <- manova(rbind(YAdelie,YGentoo) ~ c(rep('Adelie',dim(YAdelie)[1]),rep('Gentoo',dim(YGentoo)[1])))
+summary(fit1,test="Hotelling-Lawley")
+
+
+fit3 <- manova(rbind(YChinstrap,YGentoo) ~ c(rep('Chinstrap',dim(YChinstrap)[1]),rep('Gentoo',dim(YGentoo)[1])))
+summary(fit1,test="Hotelling-Lawley")
+```
+
+\newline
+
+## Question 10: Consider your own dataset and whether or not DA would be appropriate and if the data would meet the DA assumptions. (10 pts)
