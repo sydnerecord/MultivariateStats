@@ -139,6 +139,7 @@ perm_MVdisp
 
 ## Question 1: Should you transform the penguin variables based on the tests for homogeneity of variance? (10 pts)
 
+
 If you think yes, use the code below. If you think no, skip ahead.
 
 ```{r}
@@ -235,7 +236,7 @@ Outliers can have a large influence on canonical axes in DA. You are going to ta
 #Calculate a within-group distance matrix:
 #Adelie
 
-eucDist<- vegdist(penguins_noNA[penguins_noNA$species=='Adelie',3:6],"euclidean")
+eucDist<- vegdist(penguins_noNA[penguins_noNA$species=='Adelie',c(3:4,6)],"euclidean")
 
 #Calculate the average distance of each sample to all other samples (i.e. column average) and turn the means into z-scores:
 
@@ -255,7 +256,7 @@ Adelie_out
 #Repeat for the other two groups (i.e.,species):
 
 #Chinstrap
-eucDist<- vegdist(penguins_noNA[penguins_noNA$species=="Chinstrap",3:6],"euclidean")
+eucDist<- vegdist(penguins_noNA[penguins_noNA$species=="Chinstrap",c(3:4,6)],"euclidean")
 multOut<-scale(colMeans(as.matrix(eucDist)))
 hist(multOut)
 Chinstrap_out<-multOut [multOut >3,]
@@ -263,7 +264,7 @@ Chinstrap_out
 
 #Gentoo
 
-eucDist<- vegdist(penguins_noNA[penguins_noNA$species=="Gentoo",3:6],"euclidean")
+eucDist<- vegdist(penguins_noNA[penguins_noNA$species=="Gentoo",c(3:4,6)],"euclidean")
 multOut<-scale(colMeans(as.matrix(eucDist)))
 hist(multOut)
 Gentoo_out<-multOut[multOut >3,]
@@ -284,7 +285,7 @@ penguins_noNA <- penguins_noNA[-c(96,104,38,39,18,40),]
 Next we test for linear relationship between variables. This is key to making sure that the variables change in a linear fashion along underlying gradients (i.e. canonical axes):
 
 ```{r fig.height= 7, fig.width= 7}
-pairs(penguins_noNA[,3:6])
+pairs(penguins_noNA[,c(3:4,6)])
 ```
 
 Believe it or not, those pass as linear relationships!
@@ -312,8 +313,6 @@ train <- sample(seq(1:dim(penguins_noNA)[1]), round(dim(penguins_noNA)[1]*.66))
 
 ## Question 5: What does the *dim* function do in the code chunk above? Why do we have to use the round function? (10 pts)
 
-Check the frequency of each species in the training data, which will help set your priors proportional to the number of samples in each species group:
-
 ```{r}
 #Determine the counts of each species in the training data
 priorfreq<-table(penguins_noNA$species[train])
@@ -326,7 +325,7 @@ prior <- (as.vector(priorfreq)/round(dim(penguins_noNA)[1]*.66))
 Next run the DA for the training data:
 
 ```{r}
-penguinsLDA <- lda(species ~ bill_length_mm + bill_depth_mm + flipper_length_mm, penguins_noNA, prior = prior, subset = train)
+penguinsLDA <- lda(species ~ bill_length_mm + bill_depth_mm + body_mass_g, penguins_noNA, prior = prior, subset = train)
 ```
 
 **Pro Tip: if you wanted to use all variables in a dataset, then “Species \~ .” would be the model and the “dot” stands for all of the variables (so you don’t have to type them all)**
@@ -411,7 +410,7 @@ Unfortunately, `lda` doesn’t provide an easy way to calculate the standardized
 For candisc, you build a linear model using lm:
 
 ```{r}
-penguinsmod <- lm(cbind(bill_length_mm, bill_depth_mm, flipper_length_mm) ~ species, data=penguins_noNA[train, ])
+penguinsmod <- lm(cbind(bill_length_mm, bill_depth_mm, body_mass_g) ~ species, data=penguins_noNA[train, ])
 ```
 
 And run the candisc function:
@@ -469,7 +468,7 @@ In MANOVA, we are interested if groups differ in their measured variables. In DA
 ```
 
 ```{r eval=FALSE}
-Y<-as.matrix(penguins_noNA[,3:5])
+Y<-as.matrix(penguins_noNA[,c(3:4,6)])
 Sp<-factor(penguins_noNA$species)
 
 fit <- manova(Y ~ Sp)
@@ -481,9 +480,9 @@ summary(fit,test="Wilks")
 ## Post-hoc tests:
 
 ```{r}
-YAdelie<-as.matrix(penguins_noNA[penguins_noNA$species=='Adelie',3:5])
-YChinstrap<-as.matrix(penguins_noNA[penguins_noNA$species=='Chinstrap',3:5])
-YGentoo<-as.matrix(penguins_noNA[penguins_noNA$species=='Gentoo',3:5])
+YAdelie<-as.matrix(penguins_noNA[penguins_noNA$species=='Adelie',c(3:4,6)])
+YChinstrap<-as.matrix(penguins_noNA[penguins_noNA$species=='Chinstrap',c(3:4,6)])
+YGentoo<-as.matrix(penguins_noNA[penguins_noNA$species=='Gentoo',c(3:4,6)])
 Sp<-factor(penguins_noNA$species)
 
 fit1 <- manova(rbind(YAdelie,YChinstrap) ~ c(rep('Adelie',dim(YAdelie)[1]),rep('Chinstrap',dim(YChinstrap)[1])))
