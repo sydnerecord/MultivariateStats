@@ -1,0 +1,303 @@
+---
+title: "Lab 9 Classification and Regression Trees (CART) "
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_knit$set(root.dir = normalizePath("../"))
+opts_chunk$set(echo = TRUE, tidy = TRUE)
+```
+\newline
+
+The goal of this lab is to become familiar with Classification and Regression (CART). CART allows you to determine what variables are important in separating groups. It differs from DA in that it does not have the assumptions of a parametric test and thus provides a more flexible approach to discrimination.
+
+\newline
+
+#Set up R session
+
+## Data
+
+Today you will be using the `penguins` data set found in the package datasets in R. To access this data set, simply type:
+
+
+```{r results='hide'}
+library(palmerpenguins)
+penguins <- as.data.frame(penguins)
+```
+
+To learn more about the data set:
+
+```{r eval=FALSE}
+?penguins
+```
+\newline
+
+You will also use the “ozone.csv” dataset available on our shared Google Drive for regression trees.
+
+```{r}
+oz<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab9/ozone.csv",header=TRUE)
+```
+
+
+\newline
+
+## Download packages 
+We will be using the following packages: 
+
+
+```{r warning=FALSE, message=FALSE}
+library(MASS)
+library(rpart)
+library(ade4)
+library(vegan)
+```
+
+\newline
+
+# CART
+
+## Setting the training and testing data
+Like you did for DA, you are going to split our data set into “training” data and “testing” data.  This will allow you to test the predictions of the CART model on a “new” data set.
+
+Randomly select 75 samples from the iris data set. Use “set.seed” so we are all working with the same training set:
+
+```{r}
+set.seed(51)
+#Create a vector whose length is one half of the number of rows in the penguins data set called train that will indicate the rows randomly selected for the training data.
+train <- sample(seq(1:dim(penguins)[1]), round(dim(penguins)[1]*.66))
+```
+
+
+Check the frequency of each species in the training data, to make sure they are relatively proportional to the frequency in the complete data set.
+
+```{r}
+freq<-table(penguins$species[train])
+freq
+```
+\newline
+
+## Specifying the model
+
+Next specify the CART model. In the penguins data set, Species is the categorical response variables and the four measures of penguin morphology are the explanatory variables:
+
+```{r}
+model <- species ~ .
+```
+
+**“Species ~ .” is the model and the “dot” stands for all of the explanatory variables (so you don’t have to type them all)**
+
+\newline
+
+## Running the CART algorithm
+
+You will use the `rpart` function in the *rpart* package to develop CART models.
+
+```{r eval=FALSE}
+?rpart
+```
+
+
+```{r}
+penguins_rpart <- rpart(model, data = penguins[train,], method="class", control = rpart.control(minsplit = 10))
+```
+
+**Look up what `rpart.control` and it’s parameters do and play with them!**
+
+\newline
+
+## Plotting Cart Tree and viewing summary
+You will plot your tree (made by the code I provided) using the function `post.rpart`:
+
+
+```{r eval=FALSE}
+?post.rpart
+```
+
+```{r fig.height= 7, fig.width= 7}
+post(penguins_rpart, file = "", title = "Penguin Classification Tree")
+```
+
+## Question 1: What do the three numbers separated by slashes refer to in each square or circle? (10 pts)
+
+## Question 2: What are the splitting criteria (i.e., the questions asked as the data are sorted into groups by the tree)? (10 pts)
+
+## Question 3: What island are Gentoos most associated with? (10 pts)
+
+Now, look at a node by node summary of the tree and the variable importance:
+
+```{r eval=FALSE}
+summary(penguins_rpart)
+```
+There is a lot in this output. Below we will sort through some of this output and take a closer look at it.
+
+\newline
+
+## Cost-complexity pruning
+
+Now let’s look at the cross-validation results:
+
+
+```{r}
+printcp(penguins_rpart)
+```
+
+- The first column is the complexity parameter (CP) which shows how much each node contributes to the classification rate and thus how misclassification would increase with the removal of a given node.
+
+- The second column shows the split.
+
+- The third column shows the relative error (misclassification rate). This is the proportion of samples misclassified in the “root node” (first node) that are misclassified at any subsequent node. To get the absolute error, multiply these values times the misclassification rate of the first node.
+
+- The fourth column is the estimated error from the cross-validation procedure.
+
+- The fifth column is the standard error from the cross-validation procedure.
+
+\newline
+
+Next, plot the results to determine the optimal tree:
+
+```{r}
+plotcp(penguins_rpart)
+```
+
+Remember, you are going to use the 1SE rule of thumb. Select the tree size furthest to the left (i.e. fewest leaves) that is within 1 SE of the minimum estimated error.
+
+## Question 4: How big is the optimal tree? (10 pts)
+
+\newline
+
+
+## Pruning the tree
+
+You will prune the tree using `prune.rpart` function.
+
+```{r eval=FALSE}
+?prune.rpart
+```
+
+First, let’s set the cp for the optimal tree size. This extracts the cp value according to the 1-SE rule. *Note you will have to change the row, column designations for other examples*. 
+
+```{r}
+cp<-printcp(penguins_rpart)[3,1]
+```
+
+Now, get out the pruning shears:
+
+
+```{r  fig.height= 7, fig.width= 7}
+penguins_prune <- prune(penguins_rpart, cp = cp)
+print(penguins_prune)
+
+#And plot the pruned tree:
+post(penguins_prune, file = "", title = "Penguins pruned tree")
+```
+## Question 5: How does this tree differ from the original tree? (10 pts)
+
+\newline
+
+
+## Classification accuracy
+
+Now we have our optimal tree. Let’s see how accurately both the unpruned and pruned tree classify the testing data:
+
+
+```{r}
+
+#classification matrix
+Ct_unprune<-table(predict(penguins_rpart, penguins[-train,], type = "class"), penguins[-train, "species"])
+Ct_prune<-table(predict(penguins_prune, penguins[-train,], type = "class"), penguins[-train, "species"])
+
+Ct_unprune
+Ct_prune
+
+#classification accuracy
+class_unprune<-sum(diag(prop.table(Ct_unprune)))
+class_prune<-sum(diag(prop.table(Ct_prune)))
+
+class_unprune
+class_prune
+```
+\newline
+
+## Question 6: Did pruning help much? (10 pts)
+
+\newline
+
+
+# Compare with DA
+
+Pull up your code from last week and run a DA for the penguin data. 
+
+## Question 7: How does the CART classification rate for the training data compare to the DA classification rate? (10 pts)
+
+\newline
+
+# Regression Tree With a Continuous response
+
+In the penguins example, you were predicting samples to species (classes). In this example, there is a continuous response variable. I don't ask any questions for this example as it is mainly to show you how the coding works for a continuous response variable. Here we will use regression trees on the “ozone.csv” available on our shared Google Drive. This data set contains information on ozone, radiation, temperature, and wind on 110 days from May to September 1973 in New York. Measurements of daily ozone con- centration (ppb), wind speed (mph), daily maximum temperature (degrees F), and solar radiation (langleys). Here, you will use ozone and the response variable and the remaining variable as predictors (i.e., used to make splits in the tree).
+
+Create a training data set with 60 samples:
+
+```{r}
+train <- sample(1:110, 60)
+```
+
+
+Specify the model:
+
+```{r}
+model <- ozone ~ .
+```
+
+Utilize rpart to construct the tree:
+
+```{r}
+oz_rpart <- rpart(model, data = oz[train,],method="anova", control = rpart.control(minsplit = 10))
+```
+
+
+Here we denote the type of tree using method = “anova”, which is used for continues variables.
+
+\newline
+
+Now let’s look at the cross-validation results:
+
+```{r}
+printcp(oz_rpart)
+plotcp(oz_rpart)
+cp<-printcp(oz_rpart)[3,1]
+cp
+```
+
+
+Now, get out the pruning shears:
+
+```{r}
+oz_prune <- prune(oz_rpart, cp = cp)
+print(oz_prune)
+summary(oz_prune)
+```
+
+
+Plot pruned tree:
+
+```{r fig.height= 10, fig.width= 7}
+post(oz_prune, file = "", title = "Ozone Pruned Tree")
+sum(residuals(oz_prune)^2)
+```
+
+
+Predict with both trees:
+
+```{r}
+pruned<-predict(oz_prune, oz[-train,],type = "vector")
+
+full<-predict(oz_rpart, oz[-train,],type = "vector")
+```
+
+## Question 8: Consider your own dataset, would a CART analysis be appropriate to perform on it? (30 pts)
+
