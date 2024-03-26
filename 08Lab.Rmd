@@ -367,7 +367,7 @@ corTest<-lm(penguinsLDA.p$x~penguins$species[train])
 summary(corTest)
 ```
 
-## Question 7: How does the correlation and significance look for each canonical axis? (10 pts)
+## Question 7: How does the multiple r-squared and significance look for each canonical axis? (10 pts)
 
 \newline
 
