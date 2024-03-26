@@ -64,7 +64,7 @@ library(vegan)
 ## Setting the training and testing data
 Like you did for DA, you are going to split our data set into “training” data and “testing” data.  This will allow you to test the predictions of the CART model on a “new” data set.
 
-Randomly select 75 samples from the iris data set. Use “set.seed” so we are all working with the same training set:
+Randomly select two-thirds of the samples from the penguins data set. Use “set.seed” so we are all working with the same training set:
 
 ```{r}
 set.seed(51)
@@ -179,7 +179,7 @@ You will prune the tree using `prune.rpart` function.
 ?prune.rpart
 ```
 
-First, let’s set the cp for the optimal tree size. This extracts the cp value according to the 1-SE rule. *Note you will have to change the row, column designations for other examples*. 
+First, let’s set the cp for the optimal tree size. This extracts the cp value according to the 1-SE rule. *Note you will have to change the row, column designations for other examples. Remember that matrix notation in R is [rows,columns]. The below code selects the cp values in the first column for the first three rows that correspond to the first three nodes of the dendrogram*. 
 
 ```{r}
 cp<-printcp(penguins_rpart)[3,1]
