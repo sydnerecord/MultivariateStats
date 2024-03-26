@@ -1,0 +1,321 @@
+---
+title: "Lab 10 Constrained Ordination  "
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_knit$set(root.dir = normalizePath("../"))#in relation to where the rmd file is not project
+opts_chunk$set(echo = TRUE, tidy = TRUE)
+```
+\newline
+
+The goal of this lab is to apply Constrained Ordination techniques to determine the influence of explanatory variables on patterns of variation in multivariate response variables. Constrained ordination is an extension of unconstrained ordination techniques in which the solution is constrained to be expressed by explanatory variables. The two approaches you will consider are **1) Redundancy Analysis (RDA)**, which assume a linear relationship between response and explanatory variables and builds off of PCA, and **2) Canonical Correspondence Analysis (CCA)**, which assumes a unimodal relationship between response and explanatory variables and builds off of Correspondence Analysis.
+
+\newline
+
+# Set up R session
+
+## Data
+
+Today you will be using a data set from Northern Finland that includes plant cover data for 44 species (`varespec` in library *vegan*) and 14 environmental variables (`varechem` in library *vegan*) across 24 sites.
+
+## Download packages 
+We will be using the following packages: 
+
+```{r warning=FALSE, message=FALSE}
+library(raster)
+library(vegan)
+```
+
+\newline
+
+**You will also be using a function from a Biostats package developed by Kevin McGarigal.**
+This package (i.e., R script) is in our shared Google Drive folder for Lab 10. You will use the source function to make the functions in it accessible while performing this exercise.
+
+
+```{r }
+source("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab10/biostats.r")
+```
+\newline
+
+## Import data
+
+After downloading the vegan library, explore and call in the data sets `varespec` and `varechem`. Below we use the 'str' and 'summary' functions to get to know these datasets a bit more.
+
+```{r results='hide'}
+data(varespec)
+
+data(varechem)
+
+str(varespec)
+summary(varespec)
+
+str(varechem)
+summary(varechem)
+```
+
+To learn more about the data sets:
+
+```{r eval=FALSE}
+?varespec
+
+?varechem
+```
+\newline
+
+#	Data selection, transformation and standardization
+Species within community data sets vary greatly in there occurrence, abundance, and habitat specificity. Species that are common, widespread and extremely abundant can obscure patterns in the ordination. Species that are rare and have few occurrences in a data set may not be accurately placed in ecological space. You must decide which species are “rare” and which are super abundant.
+
+\newline
+
+## Selecting Species
+To explore patterns of rarity and commonness, you will use the `foa` function from the *Biostats* package. There is information on this function in the documentation for this source code, which can be found in a pdf in our Google Drive for Lab 10. This function will give you a whole series of plots that allow you to explore the occurrence and abundance patterns of the species in your data. Note that you will need to hit return for the plotting to proceed. The second plot, *Cumulative Distribution of Species Relative Occurrence*, will be the one we use to remove common and/or rare species that have greater 95% relative occurrence or less than 5% relative occurrence across the data set, relatively. Note that you can look at these plots in a new window that is easier to toggle between plots by clicking on the square with a small arrow pointing into it that appears just below the code chunk to the upper right of the graphs produced.
+
+\newline
+```{r results='hold'}
+occur<-foa.plots(varespec)
+
+rare <- which(occur[,2]<5)
+
+common<- which(occur[,2]>95)
+
+reduced<-varespec[,-c(rare,common)]
+
+```
+\newline
+
+## Species transformations and standardizations
+
+First, check if species abundances are normally distributed across sites. 
+
+```{r eval=FALSE}
+mapply(hist,as.data.frame(varespec[,1:44]),main=colnames(varespec[,1:44]),xlab="abundance")
+```
+\newline
+
+As you can see, most of the species distributions are right skewed. Use the log transformation (logx+1) to transform the species distributions for both the full and `reduced` datasets:
+
+```{r results='hide'}
+log.full<-log1p(varespec)
+log.red<-log1p(reduced)
+```
+\newline
+
+Next, check the row and column sum variability using the coefficient of variation (cv) for both data sets:
+
+```{r}
+#Full data set:
+rsum<-rowSums(log.full)
+csum<-colSums(log.full)
+cv(rsum)
+cv(csum)
+
+#Reduced data set:
+rsumRed<-rowSums(log.red)
+csumRed<-colSums(log.red)
+cv(rsumRed)
+cv(csumRed)
+```
+\newline
+If either the row or column sums have cv >50, we want to standardize by the total. This is the case for this dataset, so the code below does that standardization.
+```{r}
+cSpec<-sweep(log.full,2,csum,"/")
+cSpecRed<-sweep(log.red,2,csumRed,"/")
+
+```
+\newline
+## Determine Response Model (RDA vs. CCA)
+
+Now that now that the date are reduced, transformed and standardized, you need to determine if species abundances show a linear (RDA) or a unimodal (CCA) relationship with the underlying gradient.
+
+First, use Detrended Correspondence Analysis (DCA) to determine the length of the canonical axes. You will use the `decorana` function in the *vegan* Library. While DCA is a separate analysis with its own assumptions and multifaceted output, you will focus on axis length. An axis length > 3 is evidence of a unimodal relationship. An axis length of <3 is evidence of a linear relationship.
+\newline
+```{r results='hide'}
+?decorana
+
+decorana(cSpec)
+decorana(cSpecRed)
+
+```
+## Question 1: Do the axis lengths suggest that the relationship between species abundances and the underlying gradient is linear or unimodal for the full data set? How about for the reduced data set? (5 pts)
+
+\newline
+
+Next, plot out each species on the first canonical axis. You need to set the environmental variables first (the next section will get into the details of the explanatory variables). Based on *a priori* knowledge of this system, we will use the variables AL, P, and N in the ordination because previous work has shown them to be important drivers of moss diversity. Once we specify them as the variables and standardize them to account for different measurement units, we will run the initial CCA to check for linearity.
+
+Set the Explanatory Variables:
+
+```{r}
+Vars<-varechem[,c(1,2,7)]
+env<-as.data.frame(scale(Vars))
+
+```
+\newline
+Run CCA:
+
+```{r}
+sp.CCA<-cca(cSpec~.,data=env)
+```
+\newline
+
+Function for plotting species abundances vs. CCA Axis 1:
+
+```{r eval=FALSE}
+f2 <- function(x) {
+  plot(x~sp.CCA$CC$wa[,1],xlab="CCA AXIS 1", ylab= "Abundance ")
+}
+
+#Apply the function across all the species:
+
+mapply(f2,varespec)
+
+```
+\newline
+
+# Explanatory Variables
+
+Constrained ordination affords you the ability to include explanatory variables in the ordination. You want to avoid multicollinearity among explanatory variables and check if they are measured on the same scale. As mentioned before, based on *a priori* knowledge of this system, we will use the variables AL, P, and N in the ordination.
+
+First look at all of the pairwise correlations between these variables.
+\newline
+```{r results='hide'}
+Vars<-varechem[,c(1,2,7)]
+Vars
+round(as.dist(cor(Vars)),2)
+
+```
+## Question 2: Are the selected predictor variables collinear? (5 pts)
+
+\newline
+## Question 3: Do the variables AL, P, N look like they are measured on a different scale? Check the cv of the column sums to see if you need to z-standardize them. (5 pts)
+
+```{r}
+cv(colSums(Vars))
+```
+\newline
+Based on your answer to question 3, if you think you need to make a data frame of the scaled variables to run the Constrained Ordination, here is some code to do so:
+
+```{r}
+env<-as.data.frame(scale(Vars))
+```
+
+\newline
+#	Running the CCA
+
+You will run the constrained ordination using the `cca` in the *vegan* library.
+
+```{r eval=FALSE}
+?cca
+```
+\newline
+## Unconstrained Ordination (CA)
+\newline
+Before running the constrained model, run an unconstrained ordination (i.e. a regular Correspondence Analysis (CA). CA will give you a measure of the amount of variation in the site by species matrix that you will try to explain with the explanatory variables (i.e. constraints).
+\newline
+```{r}
+#Full Data
+ca<-cca(cSpec)
+plot(ca)
+summary(ca)
+        
+#Reduced Data      
+ca<-cca(cSpecRed)
+plot(ca)
+summary(ca)
+
+```
+## Question 4: What is the total variation of the CA? (5 pts)
+
+\newline
+
+## Constrained Ordination using CCA on the full data set (i.e., cSpec)
+
+```{r}
+sp.CCA<-cca(cSpec~.,data=env)
+summary(sp.CCA)
+
+```
+
+\newline
+
+The first thing you should focus on in the summary is the proportion of “inertia” (i.e. variance) explained by the Constrained Ordination. Notice that the total amount of inertia is the same as the Unconstrained Ordination you just ran. 
+
+Now look at the eigenvalue and proportion and cumulative amount of variation.
+
+## Monte Carlo testing of the significance of the constrained axis.
+This permutation allows you to test if the constrained axes explain more variation than would be expected randomly. You will use the `anova.cca` function in vegan to conduct the permutation. It is “anova-like” but not truly an anova.
+\newline
+Global Test (i.e. all predictor variables together):
+
+```{r}
+anova(sp.CCA)
+```
+\newline
+Axes Tests (i.e. each axis individually):
+```{r}
+anova(sp.CCA,by='axis')
+```
+\newline
+Variable Tests (i.e. each variable individually):
+```{r}
+anova(sp.CCA,by='terms')
+```
+\newline
+
+## Observed (F matrix) and Predicted (Z Matrix) Site Scores
+Now look back at your cca summary again:
+
+```{r eval=FALSE}
+summary(sp.CCA)
+```
+\newline
+The matrix labeled “Site scores (weighted averages of species scores)” is the F matrix and the matrix labeled “Site constraints (linear combinations of constraining variables)”is the Z matrix. Look at these two sets of site scores projected in ordination space:
+
+
+```{r}
+par(mfrow=c(1,2))
+plot(sp.CCA$CC$wa[,1],sp.CCA$CC$wa[,2],xlab="CCA AXIS 1", ylab= "CCA AXIS 2")
+plot(sp.CCA$CC$u[,1],sp.CCA$CC$u[,2],xlab="CCA AXIS 1", ylab= "CCA AXIS 2")
+
+```
+\newline
+Look at the correlation between these two matrices. These correlations can lend insight as to how well the predicted site locations match the observed ones. However, they are not to be trusted as the only line of evidence.
+
+```{r}
+spenvcor(sp.CCA)
+```
+\newline
+
+## Intra-set correlations and biplot scores for the constraining variables.
+Correlations between the Z matrix (predicted site scores) and the environmental variables provide information on which variables have the largest influence on the constrained ordination. These also denote the placement of the environmental variables as vectors on the CCA tri-plot. 
+
+```{r}
+sp.CCA$CCA$biplot
+```
+
+\newline
+## The Tri-Plot (using the site scores from the F matrix):
+
+```{r}
+plot(sp.CCA,choices=c(1,2),display=c('wa','sp','bp'),scaling=2)
+```
+\newline
+
+and using the site scores from the Z matrix:
+
+```{r}
+plot(sp.CCA,choices=c(1,2),display=c('lc','sp','bp'),scaling=2)
+```
+\newline
+
+
+*Now run the constrained ordination with the reduced data set. Does excluding the common species improve the effectiveness of the constrained ordination and/or change your interpretation?*
+
+## Question 5: Write up the results of the CCA analysis as you would for a peer reviewed publication. For some inspiration, I put a paper in the lab Google drive folder that can serve as an example, or feel free to search the literature and find other papers that employ CCA to use as examples. (50 pts)
+
+## Question 6: Would CCA be appropriate for your own data set? (30 pts)
