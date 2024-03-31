@@ -1,0 +1,252 @@
+---
+title: "Lab 11: RDA and Variance partitioning"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    number_sections: yes
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_knit$set(root.dir = normalizePath("../"))#in relation to where the rmd file is not project
+opts_chunk$set(echo = TRUE, tidy = TRUE)
+```
+
+\newline
+
+The goal of this lab is to apply Redundancy Analysis (RDA) to determine the influence of explanatory variables on patterns of variation in multivariate response variables.
+Constrained ordination is an extension of unconstrained ordination techniques in which the solution is constrained to be expressed by explanatory variables.
+You will also explore variable selection and variance partitioning to further interpret the results of RDA.
+These methods can also be applied to CCA.
+
+\newline
+
+# Set up R session
+
+\newline
+
+## Download packages
+
+We will be using the following packages:
+
+```{r warning=FALSE, message=FALSE}
+library(vegan)
+```
+
+\newline
+
+## Import Data
+
+Today you will be using the [Doubs fish data](https://search.r-project.org/CRAN/refmans/codep/html/Doubs.html) set (Verneaux 1973) from the Doubs River in France and Switzerland.
+This data set includes a *site by species* matrix (“DoubsSpe.csv”) that includes fish abundances for 27 species across 30 sites and a site by environment (“DoubsEnv.csv”) matrix containing measurements of 11 environmental variables across 30 sites.
+
+```{r}
+spe<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab11/Doubsspe.csv",header=TRUE)
+
+env<-read.csv("G:/Shared drives/MultivariateStatistics/Data/LabData/Lab11/Doubsenv.csv",header=TRUE)
+```
+
+
+\newline
+
+Thus far, we have not encountered a categorical variable in an ordination (aside from binomial presence/absence data). Today we will recode the slope variable (pen) into a categorical variable (to explore how these are handled in the ordinations).
+Here you divide the data in the pen column into quantiles and assign a factor level to each quantile (very steep, steep, moderate, low) and place those into a new vector (pen2 that we will replace the original continuous slope variable, pen, with): \newline
+
+```{r}
+pen2 <- rep("very_steep", nrow(env))
+pen2[env$pen <= quantile(env$pen)[4]] <- "steep"
+pen2[env$pen <= quantile(env$pen)[3]] <- "moderate"
+pen2[env$pen <= quantile(env$pen)[2]] <- "low"
+pen2 <- factor(pen2, levels=c("low", "moderate", "steep", "very_steep"))
+table(pen2)
+```
+
+\newline
+Incorporate the new qualitative slope variable “pen2” into the new environmental data frame (env2):
+
+```{r}
+env2 <- env
+env2$pen <- pen2
+
+```
+
+\newline
+
+# Data transformation
+
+A common transformation for species data in RDA is the Hellinger transformation.
+This transformation is simply the square root of row normalized data (i.e., relative abundance).
+This transformation has been shown to have good statistical properties for constrained ordination.
+You will use the function `decostand` in the *vegan* package to perform this transformation:
+
+```{r}
+spe.hel <- decostand(spe, "hellinger")
+```
+
+\newline
+
+# Check for linear vs. unimodal response to determine whether to run an RDA vs. CCA
+
+First, use Detrended Correspondence Analysis (DCA) to determine the length of the canonical axes. You will use the `decorana` function in the *vegan* Library. While DCA is a separate analysis with its own assumptions and multifaceted output, you will focus on axis length. An axis length > 3 is evidence of a unimodal relationship. An axis length of <3 is evidence of a linear relationship.
+\newline
+```{r results='hide'}
+decorana(spe.hel)
+```
+Let's check out the response relative to the first axis with a CCA like we did in Lab 10:
+
+```{r}
+sp.CCA<-cca(spe.hel~.,data=env2)
+```
+\newline
+
+Function for plotting species abundances vs. CCA Axis 1:
+
+```{r eval=FALSE}
+f2 <- function(x) {
+  plot(x~sp.CCA$CC$wa[,1],xlab="CCA AXIS 1", ylab= "Abundance ")
+}
+
+#Apply the function across all the species:
+
+mapply(f2,spe.hel)
+```
+
+# Question 1: Based on the axis lengths and graphs, do you think a linear (RDA) or unimodal (CCA) response model is appropriate? (10 pts)
+
+Unfortunately, none of these criteria are entirely satisfying as they seem plagued by the problem of circularity. Specifically, the DCA and CCA models assume unimodal species responses and fits the data accordingly. For these reasons, we are going to pursue this analysis with a linear model (RDA), so that we can explore a different type of model this week. If you were doing this analysis for your own research, you would want to do your best to justify the choice between CCA and RDA. Once again this can be an instance where the decisions made during an analysis seem like more of an art than a science.
+
+# Run RDA using function rda in vegan using all the environmental variables.
+
+```{r eval=FALSE}
+?rda
+```
+
+```{r}
+spe.rda <- rda(spe.hel ~ ., env2)
+```
+
+Explore the results:
+
+```{r eval=FALSE}
+summary(spe.rda)
+```
+\newline
+
+Unadjusted R\^2 retrieved from the rda object
+
+```{r}
+R2 <- RsquareAdj(spe.rda)$r.squared
+R2
+```
+
+\newline
+
+Adjusted R\^2 retrieved from the rda object
+
+```{r}
+R2adj <- RsquareAdj(spe.rda)$adj.r.squared
+R2adj
+```
+# Question 2: How many explanatory variables did we use in this fitted model? How might the adjusted R-squared change if we reduced the number of explanatory variables in the RDA? (10 pts)
+
+\newline
+
+Plot using the F-scores:
+
+```{r}
+plot(spe.rda, scaling=1, 
+main="Triplot RDA spe.hel ~ env2 - scaling 1 - wa scores")
+spe.sc <- scores(spe.rda, choices=1:2, scaling=1, display="sp")
+arrows(0, 0, spe.sc[, 1], spe.sc[, 2], length=0, lty=1, col="red")
+
+```
+
+\newline
+
+Plot using the Z-scores:
+
+```{r}
+plot(spe.rda, scaling=1, display=c("sp", "lc", "cn"), 
+main="Triplot RDA spe.hel ~ env2 - scaling 1 - lc scores")
+arrows(0, 0, spe.sc[, 1], spe.sc[, 2], length=0, lty=1, col="red")
+```
+
+\newline
+
+# Question 3: Why do the arrows for dbo, pho, and amm plot so closely together? (10 pts)
+
+\newline
+
+Conduct a permutation test using anova function in vegan to test the significance of the model and individual axes:
+
+```{r}
+anova(spe.rda, step=1000)
+```
+
+Tests of all canonical axes:
+
+```{r}
+anova(spe.rda, by="axis", step=1000)
+```
+
+\newline
+
+# Variable Selection: forward selection using `ordiR2step` in *vegan*.
+
+Hopefully, my questions have led you to realize that we have used too many variables and that many variables are closely related (i.e., collinear) in our data set. Here we want to reduce the number of variables while maintaining a model that describes as much variance as possible. I have led you into this trap to provide an example where we use stepwise variable selection to select the predictor variables for our RDA. 
+See settings in `ordiR2step` for more options.
+\newline
+
+```{r eval=FALSE}
+??ordiR2step
+step.forward <- ordiR2step(rda(spe.hel ~ 1, data=env2), 
+scope=formula(spe.rda), R2scope = F, direction="forward", pstep=1000)
+```
+# Question 4: Describe the algorithm used by the forward selection process. How are variables selected for inclusion in the model? (20 pts)
+
+\newline
+
+# Question 5: What is the most parsimonious model? (10 pts)
+
+# Question 6: Conduct an RDA with the most parsimonious model. (10 pts)
+
+# Partial RDA
+
+\newline
+
+Partial RDA allows us to quantify the unique contribution of an explanatory variable in describing variation in a response data set. It allows us to hold other explanatory variables constant while assessing the role of the focal variable. Here, I show a partial RDA for the altitude variable “alt”. You can conduct a partial RDA for any or all explanatory variables.
+
+```{r}
+partial.alt <- rda(spe.hel ~ alt + Condition(oxy + dbo + dur) , data=env2)
+```
+
+\newline
+
+# Question 7: Explore the results of this model and conduct a permutation test to assess the significance of this model. You will need to write some code to do so. (10 pts) 
+
+Feel free to explore partial RDA for other variables in the data set.
+
+# Variance partitioning
+
+Variance partitioning allows us quantify the amount of variation attributed to each variable and the amount that is shared between variables. In some ways, it is an extension of partial RDA. We can partition variance between up to four variables (or matrices) with the `varpart` function in *vegan*. 
+
+```{r eval=FALSE}
+??varpart
+```
+
+\newline
+
+Here we partition the variance for the model we constructed through forward selection above:
+
+```{r}
+spe.part <- varpart(spe.hel,~ alt, ~oxy,~ dur ,~dbo ,data=env2)
+spe.part
+plot(spe.part, digits=2)
+
+```
+
+# Question 8: Would these analyses be appropriate for your own data set? (20 pts)
