@@ -1,10 +1,10 @@
 ---
 title: 'Lab1: RMarkdown'
 author: "Sydne Record"
-date: "2024-01-15"
+date: "2025-01-19"
 output:
-  pdf_document: default
   word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -33,7 +33,7 @@ plot(pressure)
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot. By default 'echo' is set to TRUE to show the code that generates plots. There is another parameter 'eval' that by default is set to TRUE to show the code that creates results.
 
 ## Your Assignment
-In this lab, you will use the R CheatSheet and any online resources to:
+In this lab, you will work with either the data you have brought to lab from your own research/collaborative research group or you may use the penguins.csv dataset that is posted under Lab 1 data on our course [Google drive](https://drive.google.com/drive/folders/1DLR86n3vuSmx2j-bv5D3PRa7b339GaPd). you will use the R CheatSheet available on our course Brightspace page under the assignments tab and any online resources to:
 
 1. create an RMarkdown file that will be knitted as a word document you turn in;
 2. read in your multivariate data set;
@@ -41,6 +41,6 @@ In this lab, you will use the R CheatSheet and any online resources to:
 4. create a bulleted list describing the columns in your dataset and the type of variable that each column represents (e.g., ordinal, categorical, continuous, etc. per the lab lecture slides);
 5. and create a plot of some of your data.
 
-Please be sure to show all code and results in your knitted word document. Also, create sub-headings for tasks 2-5 above.
+Please be sure to show all code and results in your knitted word document. Also, create sub-headings for tasks 2-5 above. If you use the penguins data, then additional metadata on that data are available [here](https://allisonhorst.github.io/palmerpenguins/).
 
 
